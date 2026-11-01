@@ -1,16 +1,17 @@
+
 package com.leemon4ik.lemonxr
 
 import android.app.Activity
-import android.graphics.Color
 import android.os.Bundle
+import android.graphics.Color
+import android.graphics.Typeface
 import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.LinearLayout
-import android.widget.Spinner
 import android.widget.TextView
+import android.widget.RadioGroup
+import android.widget.RadioButton
+import android.hardware.camera2.CameraManager
+import android.widget.Toast
 
 class SettingsActivity : Activity() {
 
@@ -20,162 +21,120 @@ class SettingsActivity : Activity() {
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
 
-        val preferences =
-            getSharedPreferences("lemonxr_settings", MODE_PRIVATE)
-
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(28), dp(24), dp(24))
+            setPadding(28, 36, 28, 36)
             setBackgroundColor(Color.BLACK)
         }
 
         val title = TextView(this).apply {
             text = "SETTINGS"
-            textSize = 26f
-            letterSpacing = 0.12f
+            textSize = 28f
+            letterSpacing = 0.15f
             setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
         }
 
-        root.addView(title, params(dp(56)))
+        root.addView(title)
+        root.addView(space(32))
 
         addSection(root, "CONTROL MODE")
 
-        val controlMode = addSpinner(
-            root,
-            listOf(
-                "Headset button",
-                "Hand tracking",
-                "Combined"
-            )
+        val modes = listOf(
+            "Headset button",
+            "Hand tracking",
+            "Combined"
         )
 
-        addSection(root, "CAMERA")
+        val group = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+        }
 
-        val camera = addSpinner(
-            root,
-            listOf(
-                "System default",
-                "Rear main",
-                "Rear ultra-wide",
-                "Front"
-            )
-        )
+        modes.forEach { mode ->
+            val radio = RadioButton(this).apply {
+                text = mode
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                id = ViewId.generate()
+            }
+            group.addView(radio)
+        }
 
-        addSection(root, "HAND TRACKING")
+        group.check(group.getChildAt(0).id)
 
-        val info = TextView(this).apply {
-            text = "Hand tracking options will appear here."
-            textSize = 13f
+        root.addView(group)
+        root.addView(space(30))
+
+        addSection(root, "CAMERAS")
+
+        val cameraInfo = TextView(this).apply {
+            textSize = 14f
             setTextColor(Color.LTGRAY)
         }
 
-        root.addView(info, params(dp(56)))
+        try {
+            val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+            val cameras = manager.cameraIdList
 
-        controlMode.setSelection(
-            preferences.getInt("control_mode", 0).coerceIn(0, 2)
-        )
+            cameraInfo.text = if (cameras.isEmpty()) {
+                "No cameras found"
+            } else {
+                cameras.mapIndexed { index, id ->
+                    val characteristics = manager.getCameraCharacteristics(id)
+                    val facing = characteristics.get(
+                        android.hardware.camera2.CameraCharacteristics.LENS_FACING
+                    )
 
-        camera.setSelection(
-            preferences.getInt("camera", 0).coerceIn(0, 3)
-        )
+                    val name = when (facing) {
+                        android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT ->
+                            "Front camera"
+                        android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK ->
+                            "Back camera"
+                        else -> "External camera"
+                    }
 
-        controlMode.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    preferences.edit()
-                        .putInt("control_mode", position)
-                        .apply()
-                }
-
-                override fun onNothingSelected(
-                    parent: AdapterView<*>?
-                ) {}
+                    "${index + 1}. $name (ID: $id)"
+                }.joinToString("\n\n")
             }
-
-        camera.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    preferences.edit()
-                        .putInt("camera", position)
-                        .apply()
-                }
-
-                override fun onNothingSelected(
-                    parent: AdapterView<*>?
-                ) {}
-            }
-
-        val spacer = View(this)
-        root.addView(
-            spacer,
-            LinearLayout.LayoutParams(1, 0, 1f)
-        )
-
-        val back = TextView(this).apply {
-            text = "DONE"
-            textSize = 14f
-            letterSpacing = 0.14f
-            gravity = Gravity.CENTER
-            setTextColor(Color.BLACK)
-            setBackgroundColor(Color.WHITE)
-            setOnClickListener { finish() }
+        } catch (e: Exception) {
+            cameraInfo.text = "Unable to access cameras"
         }
 
-        root.addView(back, params(dp(54)))
+        root.addView(cameraInfo)
+
+        root.addView(space(32))
+
+        val note = TextView(this).apply {
+            text = "More VR settings coming soon."
+            textSize = 12f
+            setTextColor(Color.GRAY)
+        }
+
+        root.addView(note)
 
         setContentView(root)
     }
 
-    private fun addSection(root: LinearLayout, label: String) {
-        val text = TextView(this).apply {
-            this.text = label
-            textSize = 11f
-            letterSpacing = 0.16f
+    private fun addSection(root: LinearLayout, text: String) {
+        val label = TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            letterSpacing = 0.15f
             setTextColor(Color.GRAY)
+            typeface = Typeface.DEFAULT_BOLD
         }
-
-        root.addView(text, params(dp(34)))
+        root.addView(label)
+        root.addView(space(12))
     }
 
-    private fun addSpinner(
-        root: LinearLayout,
-        values: List<String>
-    ): Spinner {
-
-        val spinner = Spinner(this)
-
-        spinner.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            values
-        )
-
-        spinner.setBackgroundColor(Color.WHITE)
-
-        root.addView(spinner, params(dp(52)))
-        root.addView(View(this), params(dp(22)))
-
-        return spinner
+    private fun space(height: Int) = android.view.View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(1, height)
     }
 
-    private fun params(height: Int) =
-        LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            height
-        )
-
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private object ViewId {
+        private var next = 1
+        fun generate(): Int = next++
+    }
 }
+
