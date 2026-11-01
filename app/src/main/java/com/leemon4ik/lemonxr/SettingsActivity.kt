@@ -5,8 +5,10 @@ import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
-import android.view.View
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.RadioGroup
@@ -21,6 +23,11 @@ class SettingsActivity : Activity() {
         getSharedPreferences("lemonxr_settings", MODE_PRIVATE)
     }
 
+    private val white = Color.WHITE
+    private val gray = Color.rgb(145, 145, 145)
+    private val dark = Color.rgb(12, 12, 12)
+    private val border = Color.rgb(55, 55, 55)
+
     private data class CameraOption(
         val id: String,
         val name: String
@@ -34,26 +41,36 @@ class SettingsActivity : Activity() {
 
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(28), dp(36), dp(28), dp(36))
+            setPadding(dp(22), dp(30), dp(22), dp(32))
             setBackgroundColor(Color.BLACK)
         }
 
         val scroll = ScrollView(this).apply {
+            isFillViewport = true
             addView(content)
         }
 
         val title = TextView(this).apply {
             text = "SETTINGS"
-            textSize = 28f
-            letterSpacing = 0.15f
-            setTextColor(Color.WHITE)
+            textSize = 27f
+            letterSpacing = 0.12f
+            setTextColor(white)
             typeface = Typeface.DEFAULT_BOLD
         }
 
         content.addView(title)
-        content.addView(space(32))
+        content.addView(space(5))
 
-        addSection(content, "CONTROL MODE")
+        val subtitle = TextView(this).apply {
+            text = "Configure your LemonXR experience"
+            textSize = 13f
+            setTextColor(gray)
+        }
+
+        content.addView(subtitle)
+        content.addView(space(30))
+
+        addSection(content, "CONTROL")
 
         val modes = listOf(
             "Headset button" to "headset",
@@ -61,50 +78,47 @@ class SettingsActivity : Activity() {
             "Combined" to "combined"
         )
 
+        val modeCard = createCard()
         val modeGroup = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
         }
 
         val modeIds = mutableMapOf<String, Int>()
 
-        modes.forEach { (label, key) ->
-            val radio = RadioButton(this).apply {
-                text = label
-                textSize = 16f
-                setTextColor(Color.WHITE)
-                buttonTintList =
-                    android.content.res.ColorStateList.valueOf(Color.WHITE)
-                id = View.generateViewId()
-            }
-
-            modeIds[key] = radio.id
+        modes.forEachIndexed { index, item ->
+            val radio = createRadio(item.first)
+            modeIds[item.second] = radio.id
             modeGroup.addView(radio)
+
+            if (index != modes.lastIndex) {
+                modeGroup.addView(separator())
+            }
         }
 
         val savedMode = prefs.getString("control_mode", "headset")
         modeGroup.check(modeIds[savedMode] ?: modeIds["headset"]!!)
 
-        modeGroup.setOnCheckedChangeListener { group, checkedId ->
+        modeGroup.setOnCheckedChangeListener { _, checkedId ->
             val selected = modes.firstOrNull {
                 modeIds[it.second] == checkedId
             }
+
             selected?.let {
-                prefs.edit().putString("control_mode", it.second).apply()
+                prefs.edit()
+                    .putString("control_mode", it.second)
+                    .apply()
             }
         }
 
-        content.addView(modeGroup)
-        content.addView(space(30))
+        modeCard.addView(modeGroup)
+        content.addView(modeCard)
 
-        addSection(content, "REAR CAMERA")
+        content.addView(space(28))
+        addSection(content, "CAMERA")
 
+        val cameraCard = createCard()
         val cameraGroup = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
-        }
-
-        val cameraInfo = TextView(this).apply {
-            textSize = 14f
-            setTextColor(Color.LTGRAY)
         }
 
         try {
@@ -127,7 +141,7 @@ class SettingsActivity : Activity() {
                     val focal = focalLengths?.firstOrNull()
 
                     val name = when {
-                        focal == null -> "Back Camera"
+                        focal == null -> "Rear camera"
                         focal <= 2.4f -> "Ultra-wide"
                         focal >= 7f -> "Telephoto"
                         else -> "Wide"
@@ -138,12 +152,11 @@ class SettingsActivity : Activity() {
             }
 
             if (options.isEmpty()) {
-                cameraInfo.text = "No rear cameras found."
-                content.addView(cameraInfo)
+                cameraCard.addView(infoText("No rear cameras found."))
             } else {
                 val counts = mutableMapOf<String, Int>()
 
-                options.forEach { camera ->
+                options.forEachIndexed { index, camera ->
                     val count = (counts[camera.name] ?: 0) + 1
                     counts[camera.name] = count
 
@@ -153,15 +166,7 @@ class SettingsActivity : Activity() {
                         "${camera.name} $count"
                     }
 
-                    val radio = RadioButton(this).apply {
-                        text = label
-                        textSize = 16f
-                        setTextColor(Color.WHITE)
-                        buttonTintList =
-                            android.content.res.ColorStateList.valueOf(Color.WHITE)
-                        id = View.generateViewId()
-                    }
-
+                    val radio = createRadio(label)
                     radio.tag = camera.id
 
                     radio.setOnClickListener {
@@ -172,55 +177,142 @@ class SettingsActivity : Activity() {
 
                     cameraGroup.addView(radio)
 
-                    if (camera.id == prefs.getString("selected_camera", null)) {
+                    if (camera.id == prefs.getString(
+                            "selected_camera", null
+                        )
+                    ) {
                         cameraGroup.check(radio.id)
+                    }
+
+                    if (index != options.lastIndex) {
+                        cameraGroup.addView(separator())
                     }
                 }
 
                 if (cameraGroup.checkedRadioButtonId == -1) {
                     val first = cameraGroup.getChildAt(0) as RadioButton
                     cameraGroup.check(first.id)
+
                     prefs.edit()
                         .putString("selected_camera", first.tag as String)
                         .apply()
                 }
 
-                content.addView(cameraGroup)
+                cameraCard.addView(cameraGroup)
             }
-
         } catch (e: Exception) {
-            cameraInfo.text = "Unable to detect rear cameras."
-            content.addView(cameraInfo)
+            cameraCard.addView(
+                infoText("Unable to detect rear cameras.")
+            )
         }
 
-        content.addView(space(30))
+        content.addView(cameraCard)
 
-        val note = TextView(this).apply {
-            text = "Camera choice is saved automatically.\nMore VR settings coming soon."
+        content.addView(space(28))
+        addSection(content, "ABOUT")
+
+        val aboutCard = createCard()
+
+        val version = TextView(this).apply {
+            text = "LEMONXR"
+            textSize = 16f
+            setTextColor(white)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+
+        val versionInfo = TextView(this).apply {
+            text = "BETA 0.1.1"
             textSize = 12f
-            setTextColor(Color.GRAY)
+            setTextColor(gray)
         }
 
-        content.addView(note)
+        val description = TextView(this).apply {
+            text = "Mobile virtual reality environment"
+            textSize = 13f
+            setTextColor(gray)
+        }
+
+        aboutCard.addView(version)
+        aboutCard.addView(space(5))
+        aboutCard.addView(versionInfo)
+        aboutCard.addView(space(12))
+        aboutCard.addView(separator())
+        aboutCard.addView(space(12))
+        aboutCard.addView(description)
+
+        content.addView(aboutCard)
+        content.addView(space(25))
+
+        val footer = TextView(this).apply {
+            text = "LEMONXR  •  VIRTUAL REALITY"
+            textSize = 10f
+            letterSpacing = 0.12f
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(90, 90, 90))
+        }
+
+        content.addView(footer)
 
         setContentView(scroll)
     }
 
-    private fun addSection(root: LinearLayout, text: String) {
-        val label = TextView(this).apply {
-            this.text = text
-            textSize = 12f
-            letterSpacing = 0.15f
-            setTextColor(Color.GRAY)
+    private fun addSection(root: LinearLayout, label: String) {
+        val text = TextView(this).apply {
+            this.text = label
+            textSize = 11f
+            letterSpacing = 0.16f
+            setTextColor(gray)
             typeface = Typeface.DEFAULT_BOLD
         }
 
-        root.addView(label)
+        root.addView(text)
         root.addView(space(12))
     }
 
+    private fun createCard() = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(15), dp(10), dp(15), dp(10))
+
+        background = GradientDrawable().apply {
+            setColor(dark)
+            cornerRadius = dp(12).toFloat()
+            setStroke(dp(1), border)
+        }
+    }
+
+    private fun createRadio(label: String) =
+        RadioButton(this).apply {
+            text = label
+            textSize = 14f
+            setTextColor(white)
+            buttonTintList =
+                android.content.res.ColorStateList.valueOf(white)
+            id = View.generateViewId()
+            minHeight = dp(52)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(5), 0, dp(5), 0)
+        }
+
+    private fun infoText(value: String) =
+        TextView(this).apply {
+            text = value
+            textSize = 13f
+            setTextColor(gray)
+            setPadding(dp(5), dp(15), dp(5), dp(15))
+        }
+
+    private fun separator() = View(this).apply {
+        setBackgroundColor(border)
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(1)
+        )
+    }
+
     private fun space(height: Int) = View(this).apply {
-        layoutParams = LinearLayout.LayoutParams(1, dp(height))
+        layoutParams = LinearLayout.LayoutParams(
+            1, dp(height)
+        )
     }
 
     private fun dp(value: Int): Int =
