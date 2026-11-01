@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 
 class MainActivity : Activity() {
 
@@ -51,7 +50,7 @@ class MainActivity : Activity() {
 
         val launchButton = createButton("LAUNCH")
         launchButton.setOnClickListener {
-            Toast.makeText(this, "VR mode is coming soon", Toast.LENGTH_SHORT).show()
+    startActivity(Intent(this, VRActivity::class.java))
         }
 
         root.addView(title, matchWrap())
