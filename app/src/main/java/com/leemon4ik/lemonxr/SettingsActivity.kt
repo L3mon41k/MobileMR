@@ -5,15 +5,26 @@ import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
+import android.view.View
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.RadioGroup
 import android.widget.RadioButton
+import android.widget.ScrollView
 import android.hardware.camera2.CameraManager
-import android.widget.Toast
+import android.hardware.camera2.CameraCharacteristics
 
 class SettingsActivity : Activity() {
+
+    private val prefs by lazy {
+        getSharedPreferences("lemonxr_settings", MODE_PRIVATE)
+    }
+
+    private data class CameraOption(
+        val id: String,
+        val name: String
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,10 +32,14 @@ class SettingsActivity : Activity() {
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
 
-        val root = LinearLayout(this).apply {
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 36, 28, 36)
+            setPadding(dp(28), dp(36), dp(28), dp(36))
             setBackgroundColor(Color.BLACK)
+        }
+
+        val scroll = ScrollView(this).apply {
+            addView(content)
         }
 
         val title = TextView(this).apply {
@@ -35,38 +50,57 @@ class SettingsActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
         }
 
-        root.addView(title)
-        root.addView(space(32))
+        content.addView(title)
+        content.addView(space(32))
 
-        addSection(root, "CONTROL MODE")
+        addSection(content, "CONTROL MODE")
 
         val modes = listOf(
-            "Headset button",
-            "Hand tracking",
-            "Combined"
+            "Headset button" to "headset",
+            "Hand tracking" to "hands",
+            "Combined" to "combined"
         )
 
-        val group = RadioGroup(this).apply {
+        val modeGroup = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
         }
 
-        modes.forEach { mode ->
+        val modeIds = mutableMapOf<String, Int>()
+
+        modes.forEach { (label, key) ->
             val radio = RadioButton(this).apply {
-                text = mode
+                text = label
                 textSize = 16f
                 setTextColor(Color.WHITE)
-                buttonTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-                id = ViewId.generate()
+                buttonTintList =
+                    android.content.res.ColorStateList.valueOf(Color.WHITE)
+                id = View.generateViewId()
             }
-            group.addView(radio)
+
+            modeIds[key] = radio.id
+            modeGroup.addView(radio)
         }
 
-        group.check(group.getChildAt(0).id)
+        val savedMode = prefs.getString("control_mode", "headset")
+        modeGroup.check(modeIds[savedMode] ?: modeIds["headset"]!!)
 
-        root.addView(group)
-        root.addView(space(30))
+        modeGroup.setOnCheckedChangeListener { group, checkedId ->
+            val selected = modes.firstOrNull {
+                modeIds[it.second] == checkedId
+            }
+            selected?.let {
+                prefs.edit().putString("control_mode", it.second).apply()
+            }
+        }
 
-        addSection(root, "CAMERAS")
+        content.addView(modeGroup)
+        content.addView(space(30))
+
+        addSection(content, "REAR CAMERA")
+
+        val cameraGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+        }
 
         val cameraInfo = TextView(this).apply {
             textSize = 14f
@@ -75,45 +109,101 @@ class SettingsActivity : Activity() {
 
         try {
             val manager = getSystemService(CAMERA_SERVICE) as CameraManager
-            val cameras = manager.cameraIdList
+            val options = mutableListOf<CameraOption>()
 
-            cameraInfo.text = if (cameras.isEmpty()) {
-                "No cameras found"
-            } else {
-                cameras.mapIndexed { index, id ->
-                    val characteristics = manager.getCameraCharacteristics(id)
-                    val facing = characteristics.get(
-                        android.hardware.camera2.CameraCharacteristics.LENS_FACING
+            manager.cameraIdList.forEach { id ->
+                val characteristics =
+                    manager.getCameraCharacteristics(id)
+
+                val facing = characteristics.get(
+                    CameraCharacteristics.LENS_FACING
+                )
+
+                if (facing == CameraCharacteristics.LENS_FACING_BACK) {
+                    val focalLengths = characteristics.get(
+                        CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
                     )
 
-                    val name = when (facing) {
-                        android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT ->
-                            "Front camera"
-                        android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK ->
-                            "Back camera"
-                        else -> "External camera"
+                    val focal = focalLengths?.firstOrNull()
+
+                    val name = when {
+                        focal == null -> "Back Camera"
+                        focal <= 2.4f -> "Ultra-wide"
+                        focal >= 7f -> "Telephoto"
+                        else -> "Wide"
                     }
 
-                    "${index + 1}. $name (ID: $id)"
-                }.joinToString("\n\n")
+                    options.add(CameraOption(id, name))
+                }
             }
+
+            if (options.isEmpty()) {
+                cameraInfo.text = "No rear cameras found."
+                content.addView(cameraInfo)
+            } else {
+                val counts = mutableMapOf<String, Int>()
+
+                options.forEach { camera ->
+                    val count = (counts[camera.name] ?: 0) + 1
+                    counts[camera.name] = count
+
+                    val label = if (count == 1) {
+                        camera.name
+                    } else {
+                        "${camera.name} $count"
+                    }
+
+                    val radio = RadioButton(this).apply {
+                        text = label
+                        textSize = 16f
+                        setTextColor(Color.WHITE)
+                        buttonTintList =
+                            android.content.res.ColorStateList.valueOf(Color.WHITE)
+                        id = View.generateViewId()
+                    }
+
+                    radio.tag = camera.id
+
+                    radio.setOnClickListener {
+                        prefs.edit()
+                            .putString("selected_camera", camera.id)
+                            .apply()
+                    }
+
+                    cameraGroup.addView(radio)
+
+                    if (camera.id == prefs.getString("selected_camera", null)) {
+                        cameraGroup.check(radio.id)
+                    }
+                }
+
+                if (cameraGroup.checkedRadioButtonId == -1) {
+                    val first = cameraGroup.getChildAt(0) as RadioButton
+                    cameraGroup.check(first.id)
+                    prefs.edit()
+                        .putString("selected_camera", first.tag as String)
+                        .apply()
+                }
+
+                content.addView(cameraGroup)
+            }
+
         } catch (e: Exception) {
-            cameraInfo.text = "Unable to access cameras"
+            cameraInfo.text = "Unable to detect rear cameras."
+            content.addView(cameraInfo)
         }
 
-        root.addView(cameraInfo)
-
-        root.addView(space(32))
+        content.addView(space(30))
 
         val note = TextView(this).apply {
-            text = "More VR settings coming soon."
+            text = "Camera choice is saved automatically.\nMore VR settings coming soon."
             textSize = 12f
             setTextColor(Color.GRAY)
         }
 
-        root.addView(note)
+        content.addView(note)
 
-        setContentView(root)
+        setContentView(scroll)
     }
 
     private fun addSection(root: LinearLayout, text: String) {
@@ -124,17 +214,15 @@ class SettingsActivity : Activity() {
             setTextColor(Color.GRAY)
             typeface = Typeface.DEFAULT_BOLD
         }
+
         root.addView(label)
         root.addView(space(12))
     }
 
-    private fun space(height: Int) = android.view.View(this).apply {
-        layoutParams = LinearLayout.LayoutParams(1, height)
+    private fun space(height: Int) = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(1, dp(height))
     }
 
-    private object ViewId {
-        private var next = 1
-        fun generate(): Int = next++
-    }
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 }
-
