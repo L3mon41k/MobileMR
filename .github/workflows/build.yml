@@ -1,4 +1,3 @@
-
 name: Build LemonXR APK
 
 on:
@@ -7,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -44,4 +43,13 @@ jobs:
         with:
           name: LemonXR-debug
           path: app/build/outputs/apk/debug/app-debug.apk
-          
+
+      - name: Publish public APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: lemonxr-latest
+          name: LemonXR latest build
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: app/build/outputs/apk/debug/app-debug.apk
