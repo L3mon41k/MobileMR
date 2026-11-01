@@ -1,8 +1,10 @@
-name: Build LemonXR APK
+
+name: Build LemonXR Beta
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - LemonXR-0.1.1-BETA
   workflow_dispatch:
 
 permissions:
@@ -41,15 +43,15 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LemonXR-debug
+          name: LemonXR-Beta-0.1.1
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Publish public APK release
+      - name: Publish Beta APK release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: lemonxr-latest
-          name: LemonXR latest build
+          tag_name: lemonxr-beta-0.1.1
+          name: LemonXR Beta 0.1.1
           prerelease: true
           make_latest: false
-          overwrite_files: true
           files: app/build/outputs/apk/debug/app-debug.apk
+          
