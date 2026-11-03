@@ -391,7 +391,7 @@ class VRActivity : Activity(), SensorEventListener {
         override fun onTouchEvent(e:MotionEvent):Boolean{if(e.action==MotionEvent.ACTION_UP){val eye=width/2f;if(eye>0)tap((e.x%eye)/(eye/480f),e.y/(height/480f))};return true}
         private fun tap(x:Float,y:Float){
             if(!menu)return
-            if(page !in listOf("home","all")&&y>420&&x<100){page="home";invalidate();return}
+            if(page !in listOf("home","all")&&y>420&&x<100){page=if(page=="keyboard")keyboardTarget else "home";invalidate();return}
             if(page=="home"){
                 if(y in 72f..140f){if(x in 235f..297f)page="all" else {val i=((x-25)/52).toInt();if(i in 0..3)open(names[i])}}
                 else if(y in 180f..365f){page="reaction";startGame()}
