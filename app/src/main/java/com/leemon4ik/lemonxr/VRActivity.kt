@@ -6,6 +6,10 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.camera2.*
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.media.*
 import android.net.Uri
 import android.os.*
@@ -23,7 +27,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-class VRActivity : Activity() {
+class VRActivity : Activity(), SensorEventListener {
     private val prefs by lazy { getSharedPreferences("lemonxr_settings", MODE_PRIVATE) }
     private lateinit var ui: VRView
     private var worker: HandlerThread? = null
@@ -39,11 +43,15 @@ class VRActivity : Activity() {
     private var pinch = false
     private var fist = false
     private var lastTap = 0L
+    private lateinit var sensors: SensorManager
+    @Volatile private var yaw = 0f
+    @Volatile private var pitch = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.decorView.systemUiVisibility = 5894 or 1024 or 512
+        sensors = getSystemService(SENSOR_SERVICE) as SensorManager
         ui = VRView(this)
         setContentView(ui)
         launchCamera()
@@ -152,8 +160,32 @@ class VRActivity : Activity() {
         } catch (_: Exception) { }
     }
 
-    override fun onPause() { closeCamera(); super.onPause() }
-    override fun onResume() { super.onResume(); if (::ui.isInitialized && !opening) launchCamera() }
+    override fun onPause() {
+        if (::sensors.isInitialized) sensors.unregisterListener(this)
+        closeCamera()
+        super.onPause()
+    }
+    override fun onResume() {
+        super.onResume()
+        if (::sensors.isInitialized) {
+            sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)?.let {
+                sensors.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+            }
+        }
+        if (::ui.isInitialized && !opening) launchCamera()
+    }
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor.type == Sensor.TYPE_GAME_ROTATION_VECTOR) {
+            val matrix = FloatArray(9)
+            val orientation = FloatArray(3)
+            SensorManager.getRotationMatrixFromVector(matrix, event.values)
+            SensorManager.getOrientation(matrix, orientation)
+            yaw = orientation[0]
+            pitch = orientation[1]
+            if (::ui.isInitialized) ui.invalidate()
+        }
+    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { }
     override fun onDestroy() { closeCamera(); super.onDestroy() }
     private fun closeCamera() {
         try { session?.close() } catch (_: Exception) {}; session=null
@@ -184,6 +216,7 @@ class VRActivity : Activity() {
 
         private fun drawEye(c:Canvas,x:Float,w:Float) {
             val s=c.save(); c.translate(x,0f); c.scale(w/480f,height/480f)
+            c.translate((-yaw*12f).coerceIn(-24f,24f),(pitch*12f).coerceIn(-24f,24f))
             val b=bitmap
             if(b!=null) {
                 val src=if(b.width>b.height) { val l=(b.width-b.height)/2; Rect(l,0,l+b.height,b.height) } else { val t=(b.height-b.width)/2; Rect(0,t,b.width,t+b.width) }
