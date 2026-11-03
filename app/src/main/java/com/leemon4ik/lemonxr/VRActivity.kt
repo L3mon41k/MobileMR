@@ -113,7 +113,7 @@ class VRActivity : Activity(), SensorEventListener {
             }
             cam.createCaptureSession(listOf(surface), object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(s: CameraCaptureSession) { session = s; try { s.setRepeatingRequest(request.build(), null, handler) } catch (_: Exception) { cameraStatus = "PREVIEW FAILED" } }
-                override fun onConfigureFailed(s: CameraCaptureSession) { cameraStatus = "PREVIEW FAILED" }
+                override fun onConfigureFailed(s: CameraCaptureSession) { cameraStatus = "PREVIEW FAILED"; runOnUiThread { ui.invalidate() } }
             }, handler)
         } catch (_: Exception) { cameraStatus = "CAMERA SESSION FAILED" }
     }
@@ -351,7 +351,7 @@ class VRActivity : Activity(), SensorEventListener {
                 "ASDFGHJKL".map{it.toString()},
                 listOf("⇧","Z","X","C","V","B","N","M","⌫","↵")
             )
-            return rows.mapIndexed { index,row -> if(index==1 && !keyboardUpper) row.map{it.lowercase(Locale.ROOT)} else row }
+            return rows.mapIndexed { index,row -> if(index in 1..3 && !keyboardUpper) row.map{it.lowercase(Locale.ROOT)} else row }
         }
         private fun keyboardKey(key:String) {
             when(key) {
