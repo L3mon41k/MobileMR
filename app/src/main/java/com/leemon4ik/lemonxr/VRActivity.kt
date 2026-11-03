@@ -297,8 +297,8 @@ class VRActivity : Activity() {
         private fun gameTap(x:Float,y:Float){
             if(started==0L||ended){if(y in 380f..440f)startGame();return}
             val col=((x-116)/59).toInt();val row=((y-139)/59).toInt();if(col !in 0..3||row !in 0..3)return
-            val cx=116+col*59;val cy=139+row*59
-            if(x<=cx+51&&y<=cy+51&&row*4+col==target){score++;target=Random.nextInt(16)}
+            val cx=116f+col*59f;val cy=139f+row*59f
+            if(x<=cx+51f&&y<=cy+51f&&row*4+col==target){score++;target=Random.nextInt(16)}
             if(SystemClock.elapsedRealtime()-started>=30000)ended=true
         }
         private fun editNote(){val e=EditText(this@VRActivity).apply{setText(note);setTextColor(Color.BLACK);hint="Write a note"};AlertDialog.Builder(this@VRActivity).setTitle("LemonXR Notes").setView(e).setPositiveButton("SAVE"){_,_->note=e.text.toString();prefs.edit().putString("quick_note",note).apply();invalidate()}.setNegativeButton("CANCEL",null).show()}
