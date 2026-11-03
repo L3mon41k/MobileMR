@@ -190,11 +190,6 @@ class VRActivity : Activity() {
                 c.drawBitmap(b,src,RectF(0f,0f,480f,480f),p); p.color=Color.argb(118,0,0,0); c.drawRect(0f,0f,480f,480f,p)
             } else c.drawColor(Color.BLACK)
             p.color=Color.WHITE;p.textSize=22f;p.typeface=Typeface.create("sans-serif-medium",0);c.drawText("LEMONXR",25f,34f,p)
-            val time=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date())
-            val date=SimpleDateFormat("dd MMM",Locale.getDefault()).format(Date())
-            val battery=registerReceiver(null,IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra(BatteryManager.EXTRA_LEVEL,-1) ?: -1
-            val batteryText=if(battery>=0) "$battery%" else "--%"
-            p.textSize=14f;c.drawText(time,260f,28f,p);p.color=Color.LTGRAY;p.textSize=10f;c.drawText("$date  •  $batteryText",260f,44f,p)
             p.color=Color.DKGRAY;c.drawLine(25f,57f,455f,57f,p)
             if(menu) when(page) { "home"->home(c); "all"->allApps(c); else->pageDraw(c) }
             else { p.color=Color.WHITE;p.textSize=15f;c.drawText("MAKE A FIST TO OPEN MENU",105f,250f,p) }
@@ -212,14 +207,21 @@ class VRActivity : Activity() {
             c.drawText(icon,x+(w-p.measureText(icon))/2,y+34f,p);p.textSize=8f
             c.drawText(name,x+(w-p.measureText(name))/2,y+54f,p)
         }
-        private fun cube(c:Canvas) {
-            panel(c,RectF(393f,73f,455f,139f))
+        private fun cube(c:Canvas,x:Float) {
+            panel(c,RectF(x,73f,x+62f,139f))
             val colors=intArrayOf(0xffff5555.toInt(),0xffffa52a.toInt(),0xffffdf45.toInt(),0xff55d477.toInt(),0xff42c5df.toInt(),0xff557cff.toInt(),0xffa56bff.toInt(),0xffe77acb.toInt(),Color.WHITE)
-            for(i in 0..8){val x=405f+(i%3)*12f;val y=82f+(i/3)*12f;p.color=colors[i];c.drawRoundRect(RectF(x,y,x+9,y+9),2f,2f,p)}
-            p.color=Color.WHITE;p.textSize=8f;c.drawText("ALL APPS",405f,132f,p)
+            for(i in 0..8){val xx=x+12f+(i%3)*12f;val y=82f+(i/3)*12f;p.color=colors[i];c.drawRoundRect(RectF(xx,y,xx+9,y+9),2f,2f,p)}
+            p.color=Color.WHITE;p.textSize=8f;c.drawText("ALL APPS",x+12f,132f,p)
         }
         private fun home(c:Canvas) {
-            names.forEachIndexed { i,n -> app(c,25f+i*60f,72f,55f,66f,icons[i],n) };cube(c)
+            for(i in 0..3) app(c,25f+i*52f,72f,47f,66f,icons[i],names[i])
+            cube(c,235f)
+            val time=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date())
+            val date=SimpleDateFormat("dd MMM",Locale.getDefault()).format(Date())
+            val battery=registerReceiver(null,IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.getIntExtra(BatteryManager.EXTRA_LEVEL,-1) ?: -1
+            p.color=Color.WHITE;p.textSize=14f;c.drawText(time,310f,99f,p)
+            p.color=Color.LTGRAY;p.textSize=9f;c.drawText(date,310f,116f,p)
+            c.drawText((if(battery>=0) "$battery%" else "--%")+"  BATTERY",310f,131f,p)
             p.color=Color.WHITE;p.textSize=13f;c.drawText("APPLICATIONS",25f,166f,p)
             panel(c,RectF(25f,180f,455f,365f));p.color=Color.WHITE;p.textSize=19f;c.drawText("REACTION",45f,220f,p)
             p.color=Color.LTGRAY;p.textSize=12f;c.drawText("4 × 4 TARGET TEST",45f,244f,p);c.drawText("Tap the red circle as quickly as you can.",45f,276f,p)
@@ -272,7 +274,7 @@ class VRActivity : Activity() {
             if(!menu)return
             if(page !in listOf("home","all")&&y>420&&x<100){page="home";invalidate();return}
             if(page=="home"){
-                if(y in 72f..140f){if(x in 393f..455f)page="all" else {val i=((x-25)/60).toInt();if(i in names.indices)open(names[i])}}
+                if(y in 72f..140f){if(x in 235f..297f)page="all" else {val i=((x-25)/52).toInt();if(i in 0..3)open(names[i])}}
                 else if(y in 180f..365f){page="reaction";startGame()}
             }else if(page=="all"){
                 if(y in 115f..300f){val col=((x-25)/108).toInt();val row=((y-115)/100).toInt();val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","Settings");val i=row*4+col;if(col in 0..3&&row in 0..1&&i in n.indices)open(n[i])}
