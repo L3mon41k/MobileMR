@@ -71,7 +71,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(55, 55, 55))
         }
 
-        val launch = createButton("LAUNCH VR", true).apply {
+        val launch = createButton("LAUNCH", true).apply {
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, VRActivity::class.java))
             }
