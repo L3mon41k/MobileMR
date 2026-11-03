@@ -426,7 +426,7 @@ class VRActivity : Activity(), SensorEventListener {
                 }
                 "reaction"->gameTap(x,y)
                 "calendar"->if(y>280)systemApp(Intent.CATEGORY_APP_CALENDAR)
-                "clock"->if(y>280)systemApp(Intent.CATEGORY_APP_CLOCK)
+                "clock"->if(y>280)try{startActivity(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))}catch(_:Exception){Toast.makeText(context,"No clock app installed.",Toast.LENGTH_SHORT).show()}
             };invalidate()
         }
         private fun open(n:String){
