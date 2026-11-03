@@ -78,7 +78,7 @@ class VRActivity : Activity(), SensorEventListener {
             val manager = getSystemService(CAMERA_SERVICE) as CameraManager
             val rear = manager.cameraIdList.filter { manager.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK }
             val id = prefs.getString("selected_camera", null)?.takeIf { it in rear } ?: rear.firstOrNull()
-            if (id == null) { cameraStatus = "NO REAR CAMERA"; ui.invalidate(); return }
+            if (id == null) { cameraStatus = "NO REAR CAMERA"; opening=false; ui.invalidate(); return }
             val chars = manager.getCameraCharacteristics(id)
             val rotation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
             val sizes = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)?.getOutputSizes(ImageFormat.YUV_420_888).orEmpty()
@@ -96,8 +96,8 @@ class VRActivity : Activity(), SensorEventListener {
             }, handler)
             manager.openCamera(id, object : CameraDevice.StateCallback() {
                 override fun onOpened(c: CameraDevice) { camera = c; preview() }
-                override fun onDisconnected(c: CameraDevice) { c.close(); camera = null; cameraStatus = "CAMERA DISCONNECTED"; runOnUiThread { ui.invalidate() } }
-                override fun onError(c: CameraDevice, e: Int) { c.close(); camera = null; cameraStatus = "CAMERA ERROR"; runOnUiThread { ui.invalidate() } }
+                override fun onDisconnected(c: CameraDevice) { c.close(); camera = null; opening=false; cameraStatus = "CAMERA DISCONNECTED"; runOnUiThread { ui.invalidate() } }
+                override fun onError(c: CameraDevice, e: Int) { c.close(); camera = null; opening=false; cameraStatus = "CAMERA ERROR"; runOnUiThread { ui.invalidate() } }
             }, handler)
         } catch (_: Exception) { cameraStatus = "CAMERA UNAVAILABLE"; opening = false; ui.invalidate() }
     }
@@ -396,7 +396,7 @@ class VRActivity : Activity(), SensorEventListener {
                 if(y in 72f..140f){if(x in 235f..297f)page="all" else {val i=((x-25)/52).toInt();if(i in 0..3)open(names[i])}}
                 else if(y in 180f..365f){page="reaction";startGame()}
             }else if(page=="all"){
-                if(y in 115f..300f){val col=((x-25)/108).toInt();val row=((y-115)/100).toInt();val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","Settings");val i=row*4+col;if(col in 0..3&&row in 0..1&&i in n.indices)open(n[i])}
+                if(y in 112f..390f){val col=((x-25)/145).toInt();val row=((y-112)/98).toInt();val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","VR Room","Settings");val i=row*3+col;if(col in 0..2&&row in 0..2&&i in n.indices)open(n[i])}
                 if(y>420&&x<100)page="home"
             }else when(page){
                 "room" -> {
