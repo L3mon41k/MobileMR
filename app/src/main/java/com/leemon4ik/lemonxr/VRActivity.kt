@@ -80,7 +80,14 @@ class VRActivity : Activity(), SensorEventListener {
             val id = prefs.getString("selected_camera", null)?.takeIf { it in rear } ?: rear.firstOrNull()
             if (id == null) { cameraStatus = "NO REAR CAMERA"; opening=false; ui.invalidate(); return }
             val chars = manager.getCameraCharacteristics(id)
-            val rotation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+            val sensorOrientation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+            val displayDegrees = when (windowManager.defaultDisplay.rotation) {
+                Surface.ROTATION_90 -> 90
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_270 -> 270
+                else -> 0
+            }
+            val rotation = (sensorOrientation - displayDegrees + 360) % 360
             val sizes = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)?.getOutputSizes(ImageFormat.YUV_420_888).orEmpty()
             val size = sizes.firstOrNull { it.width == 640 && it.height == 480 } ?: sizes.minByOrNull { abs(it.width * it.height - 307200) } ?: error("No camera size")
             reader = ImageReader.newInstance(size.width, size.height, ImageFormat.YUV_420_888, 2)
@@ -202,6 +209,12 @@ class VRActivity : Activity(), SensorEventListener {
         private var page="home"; private var menu=true
         private var calc="0"; private var stored=0.0; private var op=""; private var fresh=true
         private var note=prefs.getString("quick_note","") ?: ""
+        private var smoothYaw=0f
+        private var smoothPitch=0f
+        private var headInitialized=false
+        private var uiLagX=0f
+        private var uiLagY=0f
+        private val uiScale=0.80f
         private var keyboardBuffer=""
         private var keyboardTarget="browser"
         private var keyboardRussian=true
@@ -211,7 +224,14 @@ class VRActivity : Activity(), SensorEventListener {
 
         override fun onDraw(c:Canvas) {
             val eye=width/2f; if(eye<=0 || height<=0) return
+            if (!headInitialized) { smoothYaw=yaw; smoothPitch=pitch; headInitialized=true }
+            val dyaw=angleDelta(yaw,smoothYaw)
+            smoothYaw += dyaw*0.12f
+            smoothPitch += (pitch-smoothPitch)*0.12f
+            uiLagX=(-angleDelta(yaw,smoothYaw)*175f).coerceIn(-72f,72f)
+            uiLagY=((pitch-smoothPitch)*150f).coerceIn(-58f,58f)
             drawEye(c,0f,eye); drawEye(c,eye,eye)
+            if (kotlin.math.abs(dyaw)>0.002f || kotlin.math.abs(pitch-smoothPitch)>0.002f) postInvalidateDelayed(16)
             if(page=="reaction" && started>0 && !ended) {
                 if(SystemClock.elapsedRealtime()-started>=30000) { ended=true; if(score>best){best=score;prefs.edit().putInt("reaction_best",best).apply()} }
                 else postInvalidateDelayed(70)
@@ -220,22 +240,31 @@ class VRActivity : Activity(), SensorEventListener {
 
         private fun drawEye(c:Canvas,x:Float,w:Float) {
             val s=c.save(); c.translate(x,0f); c.scale(w/480f,height/480f)
-            c.translate((-yaw*12f).coerceIn(-24f,24f),(pitch*12f).coerceIn(-24f,24f))
+            c.drawColor(Color.BLACK)
             val b=bitmap
             if(b!=null) {
-                val src=if(b.width>b.height) { val l=(b.width-b.height)/2; Rect(l,0,l+b.height,b.height) } else { val t=(b.height-b.width)/2; Rect(0,t,b.width,t+b.width) }
-                c.drawBitmap(b,src,RectF(0f,0f,480f,480f),p); p.color=Color.argb(118,0,0,0); c.drawRect(0f,0f,480f,480f,p)
-            } else c.drawColor(Color.BLACK)
+                val scale=minOf(480f/b.width,480f/b.height)
+                val dw=b.width*scale; val dh=b.height*scale
+                val dst=RectF((480f-dw)/2f,(480f-dh)/2f,(480f+dw)/2f,(480f+dh)/2f)
+                p.isFilterBitmap=true
+                c.drawBitmap(b,null,dst,p)
+                p.color=Color.argb(118,0,0,0); c.drawRect(0f,0f,480f,480f,p)
+            }
+            val control=prefs.getString("control_mode","headset")
+            if(control!="headset") drawHands(c)
+            val uiSave=c.save()
+            c.translate(uiLagX,uiLagY)
+            c.scale(uiScale,uiScale,240f,240f)
             p.color=Color.WHITE;p.textSize=22f;p.typeface=Typeface.create("sans-serif-medium",0);c.drawText("LEMONXR",25f,34f,p)
             p.color=Color.DKGRAY;c.drawLine(25f,57f,455f,57f,p)
             if(menu) when(page) { "home"->home(c); "all"->allApps(c); else->pageDraw(c) }
             else { p.color=Color.WHITE;p.textSize=15f;c.drawText("MAKE A FIST TO OPEN MENU",105f,250f,p) }
-            val control=prefs.getString("control_mode","headset")
-            if(control!="headset") drawHands(c) else {
+            if(control=="headset") {
                 p.color=Color.WHITE;p.style=Paint.Style.STROKE;p.strokeWidth=1.5f
                 c.drawCircle(240f,240f,13f,p);p.style=Paint.Style.FILL;c.drawCircle(240f,240f,2.5f,p)
             }
             p.color=Color.LTGRAY;p.textSize=9f;c.drawText("LEMONXR  •  BETA 0.1.3",25f,466f,p)
+            c.restoreToCount(uiSave)
             c.restoreToCount(s)
         }
 
@@ -377,18 +406,53 @@ class VRActivity : Activity(), SensorEventListener {
             invalidate()
         }
         private fun drawHands(c:Canvas) {
+            val bones=arrayOf(
+                intArrayOf(0,1,2,3,4), intArrayOf(0,5,6,7,8),
+                intArrayOf(5,9,10,11,12), intArrayOf(9,13,14,15,16),
+                intArrayOf(13,17,18,19,20), intArrayOf(0,17)
+            )
             landmarks.forEach { h ->
                 if(h.size<21)return@forEach
-                val path=Path();val order=intArrayOf(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,0)
-                order.forEachIndexed{i,n->val x=h[n].x*480;val y=h[n].y*480;if(i==0)path.moveTo(x,y)else path.lineTo(x,y)}
-                p.color=Color.WHITE;p.style=Paint.Style.STROKE;p.strokeWidth=1.7f;c.drawPath(path,p);p.style=Paint.Style.FILL
-                val tip=h[8];val x=tip.x*480;val y=tip.y*480;p.strokeWidth=1.2f;c.drawLine(x,y,x.coerceIn(52f,424f),105f,p);c.drawCircle(x.coerceIn(52f,424f),105f,4f,p)
+                p.color=Color.WHITE
+                p.style=Paint.Style.STROKE
+                p.strokeWidth=2.8f
+                p.strokeCap=Paint.Cap.ROUND
+                p.strokeJoin=Paint.Join.ROUND
+                bones.forEach { chain ->
+                    for(i in 0 until chain.size-1) {
+                        val a=h[chain[i]]; val b=h[chain[i+1]]
+                        c.drawLine(a.x*480f,a.y*480f,b.x*480f,b.y*480f,p)
+                    }
+                }
+                p.style=Paint.Style.FILL
+                h.forEachIndexed { index, point ->
+                    val radius=if(index==0) 4.2f else if(index in intArrayOf(4,8,12,16,20)) 3.8f else 2.8f
+                    c.drawCircle(point.x*480f,point.y*480f,radius,p)
+                }
+                val tip=h[8];val x=tip.x*480f;val y=tip.y*480f
+                p.strokeWidth=1.5f
+                c.drawLine(x,y,x.coerceIn(52f,424f),105f,p)
+                c.drawCircle(x.coerceIn(52f,424f),105f,4f,p)
             }
+        }
+        private fun angleDelta(target:Float,current:Float):Float {
+            var d=(target-current)%(2f*Math.PI.toFloat())
+            if(d>Math.PI)d-=2f*Math.PI.toFloat()
+            if(d< -Math.PI)d+=2f*Math.PI.toFloat()
+            return d
+        }
+        private fun mapInputX(x:Float):Float {
+            val centered=240f+(x-uiLagX-240f)/uiScale
+            return centered.coerceIn(0f,480f)
+        }
+        private fun mapInputY(y:Float):Float {
+            val centered=240f+(y-uiLagY-240f)/uiScale
+            return centered.coerceIn(0f,480f)
         }
         private fun back(c:Canvas){p.color=Color.LTGRAY;p.textSize=10f;c.drawText("‹ BACK",25f,445f,p)}
         fun toggleMenu(){menu=!menu;invalidate()}
-        fun virtualTap(x:Float,y:Float){tap(x,y)}
-        override fun onTouchEvent(e:MotionEvent):Boolean{if(e.action==MotionEvent.ACTION_UP){val eye=width/2f;if(eye>0)tap((e.x%eye)/(eye/480f),e.y/(height/480f))};return true}
+        fun virtualTap(x:Float,y:Float){tap(mapInputX(x),mapInputY(y))}
+        override fun onTouchEvent(e:MotionEvent):Boolean{if(e.action==MotionEvent.ACTION_UP){val eye=width/2f;if(eye>0)tap(mapInputX((e.x%eye)/(eye/480f)),mapInputY(e.y/(height/480f)))};return true}
         private fun tap(x:Float,y:Float){
             if(!menu)return
             if(page !in listOf("home","all")&&y>420&&x<100){page=if(page=="keyboard")keyboardTarget else "home";invalidate();return}
