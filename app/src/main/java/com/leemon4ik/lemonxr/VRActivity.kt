@@ -40,6 +40,7 @@ class VRActivity : Activity(), SensorEventListener {
     @Volatile private var landmarks: List<List<PointF>> = emptyList()
     @Volatile private var cameraStatus = ""
     private var opening = false
+    @Volatile private var cameraRequested = false
     private var pinch = false
     private var fist = false
     private var lastTap = 0L
@@ -54,7 +55,6 @@ class VRActivity : Activity(), SensorEventListener {
         sensors = getSystemService(SENSOR_SERVICE) as SensorManager
         ui = VRView(this)
         setContentView(ui)
-        launchCamera()
     }
 
     private fun launchCamera() {
@@ -179,7 +179,7 @@ class VRActivity : Activity(), SensorEventListener {
                 sensors.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
             }
         }
-        if (::ui.isInitialized && !opening) launchCamera()
+        if (::ui.isInitialized && cameraRequested && !opening) launchCamera()
     }
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type == Sensor.TYPE_GAME_ROTATION_VECTOR) {
@@ -239,7 +239,10 @@ class VRActivity : Activity(), SensorEventListener {
         }
 
         private fun drawEye(c:Canvas,x:Float,w:Float) {
-            val s=c.save(); c.translate(x,0f); c.scale(w/480f,height/480f)
+            val s=c.save()
+            c.clipRect(x,0f,x+w,height.toFloat())
+            c.translate(x,0f)
+            c.scale(w/480f,height/480f)
             c.drawColor(Color.BLACK)
             val b=bitmap
             if(b!=null) {
@@ -297,7 +300,10 @@ class VRActivity : Activity(), SensorEventListener {
             p.color=Color.LTGRAY;p.textSize=12f;c.drawText("4 × 4 TARGET TEST",45f,244f,p);c.drawText("Tap the red circle as quickly as you can.",45f,276f,p)
             c.drawText("30 seconds  •  Best: $best",45f,300f,p);p.color=Color.WHITE;p.style=Paint.Style.STROKE;c.drawRoundRect(RectF(45f,320f,180f,348f),8f,8f,p);p.style=Paint.Style.FILL
             p.textSize=11f;c.drawText("PLAY GAME  →",70f,338f,p)
-            if(cameraStatus.isNotEmpty()){p.color=Color.RED;p.textSize=10f;c.drawText(cameraStatus,25f,430f,p)}
+            panel(c,RectF(25f,380f,190f,418f))
+            p.color=Color.WHITE;p.textSize=11f
+            c.drawText(if(cameraRequested) "CAMERA STARTED" else "START CAMERA",48f,404f,p)
+            if(cameraStatus.isNotEmpty()){p.color=Color.RED;p.textSize=10f;c.drawText(cameraStatus,205f,404f,p)}
         }
         private fun allApps(c:Canvas) {
             p.color=Color.WHITE;p.textSize=17f;c.drawText("ALL APPLICATIONS",25f,91f,p)
@@ -429,10 +435,19 @@ class VRActivity : Activity(), SensorEventListener {
                     val radius=if(index==0) 4.2f else if(index in intArrayOf(4,8,12,16,20)) 3.8f else 2.8f
                     c.drawCircle(point.x*480f,point.y*480f,radius,p)
                 }
-                val tip=h[8];val x=tip.x*480f;val y=tip.y*480f
-                p.strokeWidth=1.5f
-                c.drawLine(x,y,x.coerceIn(52f,424f),105f,p)
-                c.drawCircle(x.coerceIn(52f,424f),105f,4f,p)
+                val tip=h[8]
+                val pip=h[6]
+                val dx=tip.x-pip.x
+                val dy=tip.y-pip.y
+                val length=sqrt(dx*dx+dy*dy).coerceAtLeast(0.001f)
+                val startX=tip.x*480f
+                val startY=tip.y*480f
+                val rayLength=320f
+                val endX=(startX+(dx/length)*rayLength).coerceIn(0f,480f)
+                val endY=(startY+(dy/length)*rayLength).coerceIn(0f,480f)
+                p.strokeWidth=2.2f
+                c.drawLine(startX,startY,endX,endY,p)
+                c.drawCircle(endX,endY,4.5f,p)
             }
         }
         private fun angleDelta(target:Float,current:Float):Float {
@@ -459,6 +474,10 @@ class VRActivity : Activity(), SensorEventListener {
             if(page=="home"){
                 if(y in 72f..140f){if(x in 235f..297f)page="all" else {val i=((x-25)/52).toInt();if(i in 0..3)open(names[i])}}
                 else if(y in 180f..365f){page="reaction";startGame()}
+                else if(y in 380f..420f && x in 25f..195f) {
+                    cameraRequested=true
+                    if(!opening && camera==null) launchCamera()
+                }
             }else if(page=="all"){
                 if(y in 112f..390f){val col=((x-25)/145).toInt();val row=((y-112)/98).toInt();val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","VR Room","Settings");val i=row*3+col;if(col in 0..2&&row in 0..2&&i in n.indices)open(n[i])}
                 if(y>420&&x<100)page="home"
