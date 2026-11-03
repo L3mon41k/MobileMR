@@ -1,4 +1,3 @@
-
 name: Build LemonXR Beta
 
 on:
@@ -32,26 +31,24 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Download MediaPipe hand landmark model
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL --retry 3 \
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" \
+            -o app/src/main/assets/hand_landmarker.task
+          test -s app/src/main/assets/hand_landmarker.task
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
       - name: Build APK
-        run: gradle --no-daemon assembleDebug --stacktrace --info
+        run: gradle --no-daemon assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LemonXR-Beta-0.1.1
+          name: LemonXR-Beta-0.1.2
           path: app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Publish Beta APK release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: lemonxr-beta-0.1.1
-          name: LemonXR Beta 0.1.1
-          prerelease: true
-          make_latest: false
-          files: app/build/outputs/apk/debug/app-debug.apk
-          
