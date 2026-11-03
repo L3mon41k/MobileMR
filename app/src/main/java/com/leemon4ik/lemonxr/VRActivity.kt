@@ -226,7 +226,11 @@ class VRActivity : Activity(), SensorEventListener {
             p.color=Color.DKGRAY;c.drawLine(25f,57f,455f,57f,p)
             if(menu) when(page) { "home"->home(c); "all"->allApps(c); else->pageDraw(c) }
             else { p.color=Color.WHITE;p.textSize=15f;c.drawText("MAKE A FIST TO OPEN MENU",105f,250f,p) }
-            if(prefs.getString("control_mode","headset")!="headset") drawHands(c)
+            val control=prefs.getString("control_mode","headset")
+            if(control!="headset") drawHands(c) else {
+                p.color=Color.WHITE;p.style=Paint.Style.STROKE;p.strokeWidth=1.5f
+                c.drawCircle(240f,240f,13f,p);p.style=Paint.Style.FILL;c.drawCircle(240f,240f,2.5f,p)
+            }
             p.color=Color.LTGRAY;p.textSize=9f;c.drawText("LEMONXR  •  BETA 0.1.2",25f,466f,p)
             c.restoreToCount(s)
         }
