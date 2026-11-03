@@ -1,4 +1,3 @@
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,8 +11,8 @@ android {
         applicationId = "com.leemon4ik.lemonxr"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1-beta"
+        versionCode = 3
+        versionName = "0.1.2-beta"
     }
 
     compileOptions {
@@ -24,4 +23,8 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
 }
