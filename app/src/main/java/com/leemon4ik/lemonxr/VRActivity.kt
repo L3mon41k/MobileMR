@@ -197,11 +197,15 @@ class VRActivity : Activity(), SensorEventListener {
 
     inner class VRView(ctx: Context) : View(ctx) {
         private val p=Paint(Paint.ANTI_ALIAS_FLAG)
-        private val names=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock")
-        private val icons=listOf("⌕","◉","÷","31","N","◷")
+        private val names=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","VR Room","Settings")
+        private val icons=listOf("⌕","◉","÷","31","N","◷","●","◇","⚙")
         private var page="home"; private var menu=true
         private var calc="0"; private var stored=0.0; private var op=""; private var fresh=true
         private var note=prefs.getString("quick_note","") ?: ""
+        private var keyboardBuffer=""
+        private var keyboardTarget="browser"
+        private var keyboardRussian=true
+        private var keyboardUpper=true
         private var started=0L; private var score=0; private var target=Random.nextInt(16); private var ended=false
         private var best=prefs.getInt("reaction_best",0)
 
@@ -231,7 +235,7 @@ class VRActivity : Activity(), SensorEventListener {
                 p.color=Color.WHITE;p.style=Paint.Style.STROKE;p.strokeWidth=1.5f
                 c.drawCircle(240f,240f,13f,p);p.style=Paint.Style.FILL;c.drawCircle(240f,240f,2.5f,p)
             }
-            p.color=Color.LTGRAY;p.textSize=9f;c.drawText("LEMONXR  •  BETA 0.1.2",25f,466f,p)
+            p.color=Color.LTGRAY;p.textSize=9f;c.drawText("LEMONXR  •  BETA 0.1.3",25f,466f,p)
             c.restoreToCount(s)
         }
 
@@ -268,8 +272,8 @@ class VRActivity : Activity(), SensorEventListener {
         }
         private fun allApps(c:Canvas) {
             p.color=Color.WHITE;p.textSize=17f;c.drawText("ALL APPLICATIONS",25f,91f,p)
-            val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","Settings");val g=listOf("⌕","◉","÷","31","N","◷","●","⚙")
-            n.forEachIndexed { i,s -> app(c,25f+(i%4)*108f,115f+(i/4)*100f,96f,82f,g[i],s) };back(c)
+            val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","VR Room","Settings");val g=listOf("⌕","◉","÷","31","N","◷","●","◇","⚙")
+            n.forEachIndexed { i,s -> app(c,25f+(i%3)*145f,112f+(i/3)*98f,130f,82f,g[i],s) };back(c)
         }
         private fun pageDraw(c:Canvas) {
             p.color=Color.WHITE;p.textSize=17f;c.drawText(page.uppercase(Locale.getDefault()),25f,91f,p)
@@ -284,6 +288,8 @@ class VRActivity : Activity(), SensorEventListener {
                 "notes" -> {p.color=Color.LTGRAY;p.textSize=12f;c.drawText("QUICK NOTE — TAP TO EDIT",45f,145f,p);p.color=Color.WHITE;p.textSize=14f;note.split("\n").take(8).forEachIndexed{i,t->c.drawText(t.take(48),45f,180f+i*24,p)}}
                 "browser" -> {panel(c,RectF(45f,145f,435f,210f));p.color=Color.WHITE;p.textSize=15f;c.drawText("Google Search",65f,172f,p);p.color=Color.LTGRAY;p.textSize=11f;c.drawText("Tap to enter a search query.",65f,192f,p);c.drawText("Results open in your installed browser.",45f,245f,p)}
                 "reaction" -> reactionDraw(c)
+                "room" -> roomDraw(c)
+                "keyboard" -> keyboardDraw(c)
             };back(c)
         }
         private fun reactionDraw(c:Canvas) {
@@ -293,6 +299,82 @@ class VRActivity : Activity(), SensorEventListener {
             panel(c,RectF(160f,390f,320f,432f));p.color=Color.WHITE;p.textSize=13f
             val label=if(started==0L)"START" else if(ended)"PLAY AGAIN" else "RUNNING...";c.drawText(label,240f-p.measureText(label)/2,417f,p)
             if(ended){p.color=Color.LTGRAY;p.textSize=12f;c.drawText("TIME UP • SCORE $score",165f,455f,p)}
+        }
+        private fun roomDraw(c:Canvas) {
+            val wall=Path().apply { moveTo(0f,70f); lineTo(480f,70f); lineTo(480f,245f); lineTo(0f,245f); close() }
+            p.color=Color.rgb(20,25,31);c.drawPath(wall,p)
+            val left=Path().apply { moveTo(0f,70f);lineTo(105f,145f);lineTo(105f,275f);lineTo(0f,420f);close() }
+            p.color=Color.rgb(12,15,19);c.drawPath(left,p)
+            val right=Path().apply { moveTo(480f,70f);lineTo(375f,145f);lineTo(375f,275f);lineTo(480f,420f);close() }
+            p.color=Color.rgb(12,15,19);c.drawPath(right,p)
+            val floor=Path().apply { moveTo(0f,245f);lineTo(480f,245f);lineTo(480f,460f);lineTo(0f,460f);close() }
+            p.color=Color.rgb(25,28,32);c.drawPath(floor,p)
+            p.color=Color.rgb(75,85,95);p.strokeWidth=1f
+            for(i in 0..10){val x=i*48f;c.drawLine(240f+(x-240f)*0.08f,245f,x,460f,p)}
+            for(i in 0..7){val y=250f+i*i*3.7f;c.drawLine(0f,y,480f,y,p)}
+            p.color=Color.rgb(100,115,130);c.drawLine(105f,145f,375f,145f,p);c.drawLine(105f,145f,105f,275f,p);c.drawLine(375f,145f,375f,275f,p)
+            p.color=Color.WHITE;p.textSize=21f;p.typeface=Typeface.create("sans-serif-medium",0);c.drawText("LEMONXR ROOM",25f,38f,p)
+            panel(c,RectF(130f,160f,350f,290f));p.color=Color.WHITE;p.textSize=15f;c.drawText("WELCOME",190f,192f,p)
+            p.color=Color.LTGRAY;p.textSize=10f;c.drawText("A small virtual space",173f,214f,p)
+            p.color=Color.WHITE;p.style=Paint.Style.STROKE;c.drawRoundRect(RectF(165f,230f,315f,270f),7f,7f,p);p.style=Paint.Style.FILL
+            p.textSize=11f;c.drawText("APP PORTAL",205f,254f,p)
+            panel(c,RectF(55f,330f,220f,375f));panel(c,RectF(260f,330f,425f,375f))
+            p.color=Color.WHITE;p.textSize=11f;c.drawText("APP LIBRARY",91f,357f,p);c.drawText("DASHBOARD",300f,357f,p)
+            p.color=Color.LTGRAY;p.textSize=9f;c.drawText("Use the pointer or tap to interact",115f,405f,p)
+        }
+        private fun keyboardDraw(c:Canvas) {
+            panel(c,RectF(25f,76f,455f,140f));p.color=Color.WHITE;p.textSize=16f
+            c.drawText(keyboardBuffer.takeLast(32),40f,113f,p)
+            val rows=keyboardRows()
+            rows.forEachIndexed { row,keys ->
+                val y=151f+row*51f;val gap=3f;val kw=(420f-(keys.size-1)*gap)/keys.size
+                keys.forEachIndexed { col,key ->
+                    val x=30f+col*(kw+gap);panel(c,RectF(x,y,x+kw,y+43f))
+                    p.color=Color.WHITE;p.textSize=if(key.length>1)9f else 15f
+                    c.drawText(key,x+(kw-p.measureText(key))/2,y+27f,p)
+                }
+            }
+            panel(c,RectF(30f,361f,120f,405f));panel(c,RectF(130f,361f,345f,405f));panel(c,RectF(355f,361f,450f,405f))
+            p.color=Color.WHITE;p.textSize=10f;c.drawText(if(keyboardRussian)"RU / EN" else "EN / RU",49f,388f,p)
+            c.drawText("SPACE",210f,388f,p);c.drawText("DONE",384f,388f,p)
+            p.color=Color.LTGRAY;p.textSize=9f;c.drawText("VR KEYBOARD  •  TAP KEYS TO TYPE",125f,430f,p)
+        }
+        private fun keyboardRows():List<List<String>> {
+            val rows=if(keyboardRussian) listOf(
+                "1234567890".map{it.toString()},
+                "ЙЦУКЕНГШЩЗ".map{it.toString()},
+                "ФЫВАПРОЛДЖ".map{it.toString()},
+                listOf("⇧","Я","Ч","С","М","И","Т","Ь","⌫","↵")
+            ) else listOf(
+                "1234567890".map{it.toString()},
+                "QWERTYUIOP".map{it.toString()},
+                "ASDFGHJKL".map{it.toString()},
+                listOf("⇧","Z","X","C","V","B","N","M","⌫","↵")
+            )
+            return rows.mapIndexed { index,row -> if(index==1 && !keyboardUpper) row.map{it.lowercase(Locale.ROOT)} else row }
+        }
+        private fun keyboardKey(key:String) {
+            when(key) {
+                "⇧" -> keyboardUpper=!keyboardUpper
+                "⌫" -> if(keyboardBuffer.isNotEmpty()) keyboardBuffer=keyboardBuffer.dropLast(1)
+                "↵" -> keyboardBuffer += " "
+                else -> keyboardBuffer += key
+            }
+            invalidate()
+        }
+        private fun finishKeyboard() {
+            if(keyboardTarget=="notes") {
+                note=keyboardBuffer
+                prefs.edit().putString("quick_note",note).apply()
+                page="notes"
+            } else {
+                val q=keyboardBuffer.trim()
+                page="browser"
+                if(q.isNotEmpty()) try {
+                    startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/search?q="+Uri.encode(q))))
+                } catch(_:Exception) { Toast.makeText(context,"No browser installed.",Toast.LENGTH_SHORT).show() }
+            }
+            invalidate()
         }
         private fun drawHands(c:Canvas) {
             landmarks.forEach { h ->
@@ -317,15 +399,52 @@ class VRActivity : Activity(), SensorEventListener {
                 if(y in 115f..300f){val col=((x-25)/108).toInt();val row=((y-115)/100).toInt();val n=listOf("Browser","Camera","Calculator","Calendar","Notes","Clock","Reaction","Settings");val i=row*4+col;if(col in 0..3&&row in 0..1&&i in n.indices)open(n[i])}
                 if(y>420&&x<100)page="home"
             }else when(page){
+                "room" -> {
+                    if(y in 330f..380f && x in 55f..220f) page="all"
+                    else if(y in 330f..380f && x in 260f..425f) page="home"
+                    else if(y in 220f..290f && x in 130f..350f) page="all"
+                }
+                "keyboard" -> {
+                    if(y in 151f..354f) {
+                        val row=((y-151f)/51f).toInt().coerceIn(0,3)
+                        val keys=keyboardRows()[row]
+                        val gap=3f;val kw=(420f-(keys.size-1)*gap)/keys.size
+                        val col=((x-30f)/(kw+gap)).toInt()
+                        if(col in keys.indices) keyboardKey(keys[col])
+                    } else if(y in 361f..405f) {
+                        if(x in 30f..120f) keyboardRussian=!keyboardRussian
+                        else if(x in 130f..345f) keyboardBuffer+=" "
+                        else if(x in 355f..450f) finishKeyboard()
+                    }
+                }
                 "calculator"->calcTap(x,y)
-                "notes"->if(y in 130f..420f)editNote()
-                "browser"->if(y in 130f..300f)search()
+                "notes"->if(y in 130f..420f) {
+                    keyboardTarget="notes";keyboardBuffer=note;page="keyboard"
+                }
+                "browser"->if(y in 130f..300f) {
+                    keyboardTarget="browser";keyboardBuffer="";page="keyboard"
+                }
                 "reaction"->gameTap(x,y)
                 "calendar"->if(y>280)systemApp(Intent.CATEGORY_APP_CALENDAR)
                 "clock"->if(y>280)systemApp(Intent.CATEGORY_APP_CLOCK)
             };invalidate()
         }
-        private fun open(n:String){page=when(n){"Browser"->"browser";"Camera"->{Toast.makeText(context,"Passthrough camera is active.",Toast.LENGTH_SHORT).show();"home"};"Calculator"->"calculator";"Calendar"->"calendar";"Notes"->"notes";"Clock"->"clock";"Reaction"->"reaction";"Settings"->{startActivity(Intent(this@VRActivity,SettingsActivity::class.java));"home"};else->"home"};if(n=="Reaction")startGame();invalidate()}
+        private fun open(n:String){
+            page=when(n) {
+                "Browser"->"browser"
+                "Camera"->{Toast.makeText(context,"Passthrough camera is active.",Toast.LENGTH_SHORT).show();"home"}
+                "Calculator"->"calculator"
+                "Calendar"->"calendar"
+                "Notes"->"notes"
+                "Clock"->"clock"
+                "Reaction"->"reaction"
+                "VR Room"->"room"
+                "Settings"->{startActivity(Intent(this@VRActivity,SettingsActivity::class.java));"home"}
+                else->"home"
+            }
+            if(n=="Reaction")startGame()
+            invalidate()
+        }
         private fun calcTap(x:Float,y:Float){
             if(y !in 178f..406f)return
             val col=((x-48)/98).toInt();val row=((y-178)/57).toInt();if(col !in 0..3||row !in 0..3)return
@@ -340,8 +459,7 @@ class VRActivity : Activity(), SensorEventListener {
             if(x<=cx+51f&&y<=cy+51f&&row*4+col==target){score++;target=Random.nextInt(16)}
             if(SystemClock.elapsedRealtime()-started>=30000)ended=true
         }
-        private fun editNote(){val e=EditText(this@VRActivity).apply{setText(note);setTextColor(Color.BLACK);hint="Write a note"};AlertDialog.Builder(this@VRActivity).setTitle("LemonXR Notes").setView(e).setPositiveButton("SAVE"){_,_->note=e.text.toString();prefs.edit().putString("quick_note",note).apply();invalidate()}.setNegativeButton("CANCEL",null).show()}
-        private fun search(){val e=EditText(this@VRActivity).apply{hint="Search Google";setTextColor(Color.BLACK)};AlertDialog.Builder(this@VRActivity).setTitle("Google Search").setView(e).setPositiveButton("SEARCH"){_,_->val q=e.text.toString().trim();if(q.isNotEmpty())try{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://www.google.com/search?q="+Uri.encode(q))))}catch(_:Exception){Toast.makeText(context,"No browser installed.",Toast.LENGTH_SHORT).show()}}.setNegativeButton("CANCEL",null).show()}
+
         private fun systemApp(cat:String){try{startActivity(Intent(Intent.ACTION_MAIN).addCategory(cat))}catch(_:Exception){Toast.makeText(context,"No matching app installed.",Toast.LENGTH_SHORT).show()}}
     }
 }
