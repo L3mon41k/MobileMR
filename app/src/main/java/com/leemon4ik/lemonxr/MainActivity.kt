@@ -60,7 +60,7 @@ class MainActivity : Activity() {
         top.addView(subtitle, matchWrap())
 
         val version = TextView(this).apply {
-            text = "BETA 0.1.1"
+            text = "BETA 0.1.2"
             textSize = 11f
             letterSpacing = 0.15f
             setTextColor(gray)
