@@ -221,7 +221,7 @@ class SettingsActivity : Activity() {
         }
 
         val versionInfo = TextView(this).apply {
-            text = "BETA 0.1.1"
+            text = "BETA 0.1.2"
             textSize = 12f
             setTextColor(gray)
         }
